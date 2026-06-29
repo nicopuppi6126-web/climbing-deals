@@ -1,11 +1,11 @@
 import requests
 import os
 import csv
+import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import date
-import re
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 
@@ -69,69 +69,31 @@ HEADERS = {
 }
 
 # ── CATEGORISATION ────────────────────────────────────────────────────────────
-# Each category is (display_name, list_of_keywords).
-# The FIRST matching category wins, so order matters —
-# shoes must come before the clothing EXCLUDE block.
-# Products that match EXCLUDE_CLOTHING and no earlier category are dropped.
+#
+# IMPORTANT LOGIC ORDER:
+#   1. Clothing check runs FIRST — if it matches, product is dropped immediately.
+#   2. Then gear categories are checked.
+#
+# Brand names are deliberately NOT used as category keywords because brands sell
+# both gear AND clothing. "Wild Country" in Hardware keywords caused all Wild Country
+# clothing to be categorised as Hardware. Only product-type words are used.
 
-CATEGORIES = [
-    ("👟 Footwear", [
-        "climbing shoe", "climbing boot", "approach shoe", "approach boot",
-        "bouldering shoe", "rock shoe", "scarpa", "la sportiva", "boreal",
-        "evolv", "mad rock", "five ten", "unparallel", "tenaya", "red chili",
-        "mythos", "vapor", "solution", "finale", "miura", "katana",
-        "futura", "skwama", "instinct", "testarossa", "genius", "drago",
-    ]),
-    ("⚙️ Hardware", [
-        "carabiner", "karabiner", "quickdraw", "quick draw", "draw",
-        "cam", "friend", "nut ", " nut,", "stopper", "hex ", "tricam",
-        "belay device", "belay plate", "atc", "grigri", "reverso",
-        "descender", "figure 8", "ascender", "jumar", "pulley",
-        "anchor", "connector", "maillon", "snapgate", "wiregate",
-        "screwgate", "autolock", "triact", "magnetron",
-        "petzl", "black diamond", "dmm", "wild country", "camp ",
-        "mammut", "edelrid", "kong", "climbing technology",
-    ]),
-    ("🪢 Ropes & Slings", [
-        "rope", "cord", "sling", "runner", "quicksling", "dyneema",
-        "spectra", "webbing", "tape sling", "alpine draw",
-    ]),
-    ("🪖 Protection & Safety", [
-        "helmet", "crash pad", "bouldering mat", "landing pad",
-    ]),
-    ("🎒 Bags & Packs", [
-        "chalk bag", "chalk bucket", "rope bag", "rope tarp",
-        "haul bag", "crag bag", "climbing bag", "gear bag",
-        "climbing pack", "climbing rucksack",
-    ]),
-    ("🧴 Accessories & Training", [
-        "chalk", "liquid chalk", "chalk ball",
-        "fingerboard", "hangboard", "campus board", "training board",
-        "crimp", "hold", "pulley system",
-        "tape", "climbing tape", "finger tape",
-        "brush", "cleaning brush", "tick mark",
-        "crampon", "ice axe", "ice tool",
-        "harness", "sit harness", "chest harness", "full body harness",
-        "via ferrata", "via-ferrata",
-        "clip stick", "stick clip", "bolt", "anchor kit",
-        "guidebook", "guide book",
-        "boot banana", "gear sling",
-    ]),
-]
-
-# Words that identify clothing to EXCLUDE.
-# Uses word-boundary regex so "pant" matches "Pant"/"Pants" but not "important",
-# "tank" matches "Tank Top" but not "titanium", etc.
+# --- Clothing exclusion (runs first) ---
 CLOTHING_WORDS = [
-    "jacket", "fleece", "softshell", "hardshell", "windshell",
+    "jacket", "fleece", "softshell", "hardshell", "windshell", "windproof",
     "trouser", "trousers", "pant", "pants", "legging", "leggings",
     "short", "shorts", "base layer", "baselayer", "mid layer", "midlayer",
-    "t-shirt", "tshirt", "shirt", "polo", "hoodie", "hoody",
-    "sweatshirt", "jumper", "sweater", "gilet", "vest", "puffer",
+    "t-shirt", "tshirt", "shirt", "polo",
+    "hoodie", "hoody", "sweatshirt", "jumper", "sweater",
+    "gilet", "vest", "puffer", "down jacket", "insulated jacket",
+    "waterproof", "rain jacket", "shell",
     "sock", "socks", "glove", "gloves", "gaiter", "gaiters",
-    "balaclava", "beanie", "hat", "buff", "neck gaiter", "headband",
-    "underwear", "brief", "boxer", "jogger", "joggers", "tights",
-    "tank", "tee", "insulated",
+    "balaclava", "beanie", "hat", "cap", "buff", "neck gaiter", "headband",
+    "underwear", "brief", "boxer",
+    "jogger", "joggers", "tights",
+    "tank top", "tank", "tee", "top",
+    "insulated", "primaloft", "down fill",
+    "jersey", "base-layer",
 ]
 
 _CLOTHING_RE = re.compile(
@@ -139,19 +101,78 @@ _CLOTHING_RE = re.compile(
     re.IGNORECASE
 )
 
-def categorise(product_name):
-    """Return category label, or None if the product should be excluded."""
-    name_lower = product_name.lower()
+# --- Gear categories (checked after clothing exclusion) ---
+# Product-type words only — no brand names.
+CATEGORIES = [
+    ("👟 Footwear", [
+        "climbing shoe", "climbing boot", "approach shoe", "approach boot",
+        "bouldering shoe", "rock shoe",
+        "mythos", "vapor v", "vapor vx", "solution", "miura", "katana",
+        "futura", "skwama", "instinct vs", "testarossa", "genius", "drago",
+        "tc pro", "anasazi", "finale", "python", "helix", "momentum",
+        "oracle", "tarantula", "tarrantulace",
+    ]),
+    ("⚙️ Hardware", [
+        "carabiner", "karabiner",
+        "quickdraw", "quick draw",
+        "cam ", "cams ", " cam,", "friends ", "friend ",
+        " nut ", "nuts ", "stopper ", "stoppers ", "hex ", "tricam",
+        "belay device", "belay plate", "atc ", "grigri", "reverso",
+        "descender", "figure 8", "figure-8", "ascender", "jumar", "pulley",
+        "maillon", "snapgate", "wiregate", "screwgate",
+        "autolock", "triact", "magnetron",
+        "spring-loaded", "slcd", "passive protection",
+        "piton", "peg ",
+    ]),
+    ("🪢 Ropes & Slings", [
+        "rope ", "ropes ", " rope,",
+        "dynamic rope", "static rope", "half rope", "twin rope",
+        "sling ", "slings ", "runner ", "runners ",
+        "dyneema", "spectra", "webbing", "tape sling", "alpine draw",
+        "cordelette", "accessory cord",
+    ]),
+    ("🪖 Protection & Safety", [
+        "helmet", "crash pad", "bouldering mat", "landing pad", "bouldering pad",
+    ]),
+    ("🎒 Bags & Packs", [
+        "chalk bag", "chalk bucket", "chalk pot",
+        "rope bag", "rope tarp",
+        "haul bag", "crag bag", "climbing bag",
+        "climbing pack", "climbing rucksack",
+    ]),
+    ("🧴 Accessories & Training", [
+        "chalk ", "loose chalk", "liquid chalk", "chalk ball",
+        "fingerboard", "hangboard", "campus board", "training board",
+        "pulley system", "finger pulley",
+        "climbing tape", "finger tape", "rigid tape",
+        "climbing brush", "tick mark",
+        "crampon", "ice axe", "ice tool",
+        "harness ", "sit harness", "chest harness", "full body harness",
+        "via ferrata", "via-ferrata",
+        "clip stick", "stick clip",
+        "guidebook", "guide book", "topo",
+        "boot banana", "gear sling", "gear loop",
+        "belay glasses", "belay spectacles",
+        "quicklink", "quick link",
+    ]),
+]
 
-    # Check keep-categories first (shoes, hardware, etc.)
+def categorise(product_name):
+    """
+    Returns a category string, or None if the product should be excluded.
+    Clothing check runs FIRST before any gear category check.
+    """
+    # Step 1: exclude clothing immediately
+    if _CLOTHING_RE.search(product_name):
+        return None
+
+    # Step 2: match gear category by product-type keywords
+    name_lower = product_name.lower()
     for cat_label, keywords in CATEGORIES:
         if any(kw in name_lower for kw in keywords):
             return cat_label
 
-    # Clothing check uses word-boundary regex — no trailing-space tricks needed
-    if _CLOTHING_RE.search(product_name):
-        return None  # drop it
-
+    # Step 3: not clothing, not a known category — keep as catch-all
     return "🔧 Other Gear"
 
 # ── SCRAPING ──────────────────────────────────────────────────────────────────
@@ -170,8 +191,8 @@ def get_deals(store):
     deals = []
     seen = set()
 
-    vat     = VAT_MULTIPLIER if store["prices_ex_vat"] else 1.0
-    is_sale = store["sale_collection"]
+    vat       = VAT_MULTIPLIER if store["prices_ex_vat"] else 1.0
+    is_sale   = store["sale_collection"]
     min_price = store["min_price"]
 
     for collection in store["collections"]:
@@ -181,8 +202,8 @@ def get_deals(store):
             products = fetch_collection(store["url"], collection, page)
             if not products:
                 break
+
             for product in products:
-                # Check category before processing variants (saves time)
                 category = categorise(product["title"])
                 if category is None:
                     continue  # clothing — skip
@@ -240,7 +261,7 @@ def get_deals(store):
 # ── LOGGING ───────────────────────────────────────────────────────────────────
 
 def log_deals(deals):
-    # Overwrite each run — the CSV always reflects today's deals only
+    # Overwrite each run — CSV always contains today's deals only
     with open(LOG_FILE, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f, fieldnames=["date", "store", "category", "product", "price", "was", "discount_pct", "url"]
@@ -253,14 +274,12 @@ def log_deals(deals):
 
 def build_email_html(deals, today):
     if not deals:
-        return f"<p>No relevant climbing deals found today ({today}) matching criteria.</p>"
+        return f"<p>No relevant climbing deals found today ({today}).</p>"
 
-    # Group by category, then sort within each by discount
     by_category = {}
     for d in deals:
         by_category.setdefault(d["category"], []).append(d)
 
-    # Category display order
     cat_order = [
         "⚙️ Hardware",
         "👟 Footwear",
@@ -278,7 +297,7 @@ def build_email_html(deals, today):
         items = sorted(by_category[cat], key=lambda x: x["discount_pct"], reverse=True)
         rows = ""
         for d in items:
-            discount_badge = (
+            badge = (
                 f'<span style="background:#d4edda;color:#155724;padding:2px 7px;'
                 f'border-radius:4px;font-weight:bold;font-size:12px;">-{d["discount_pct"]}%</span>'
                 if d["discount_pct"] > 0 else
@@ -292,19 +311,21 @@ def build_email_html(deals, today):
                 </td>
                 <td style="padding:7px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:bold;font-size:13px;white-space:nowrap;">{d['price']}</td>
                 <td style="padding:7px 8px;border-bottom:1px solid #f0f0f0;text-align:right;color:#aaa;text-decoration:line-through;font-size:12px;white-space:nowrap;">{d['was']}</td>
-                <td style="padding:7px 8px;border-bottom:1px solid #f0f0f0;text-align:center;">{discount_badge}</td>
+                <td style="padding:7px 8px;border-bottom:1px solid #f0f0f0;text-align:center;">{badge}</td>
             </tr>"""
 
         sections += f"""
-        <h3 style="margin:24px 0 6px;color:#333;font-size:15px;">{cat} <span style="font-weight:normal;color:#999;font-size:13px;">({len(items)} deals)</span></h3>
+        <h3 style="margin:24px 0 6px;color:#333;font-size:15px;">{cat}
+            <span style="font-weight:normal;color:#999;font-size:13px;">({len(items)} deals)</span>
+        </h3>
         <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
             <thead>
                 <tr style="background:#f8f8f8;text-align:left;">
-                    <th style="padding:6px 8px;font-size:12px;color:#888;font-weight:600;">Store</th>
-                    <th style="padding:6px 8px;font-size:12px;color:#888;font-weight:600;">Product</th>
-                    <th style="padding:6px 8px;font-size:12px;color:#888;font-weight:600;text-align:right;">Price</th>
-                    <th style="padding:6px 8px;font-size:12px;color:#888;font-weight:600;text-align:right;">Was</th>
-                    <th style="padding:6px 8px;font-size:12px;color:#888;font-weight:600;text-align:center;">Saving</th>
+                    <th style="padding:6px 8px;font-size:12px;color:#888;">Store</th>
+                    <th style="padding:6px 8px;font-size:12px;color:#888;">Product</th>
+                    <th style="padding:6px 8px;font-size:12px;color:#888;text-align:right;">Price</th>
+                    <th style="padding:6px 8px;font-size:12px;color:#888;text-align:right;">Was</th>
+                    <th style="padding:6px 8px;font-size:12px;color:#888;text-align:center;">Saving</th>
                 </tr>
             </thead>
             <tbody>{rows}</tbody>
@@ -313,16 +334,16 @@ def build_email_html(deals, today):
     store_counts = {}
     for d in deals:
         store_counts[d["store"]] = store_counts.get(d["store"], 0) + 1
-    store_summary = " · ".join(f"{s}: {n}" for s, n in sorted(store_counts.items()))
+    summary = " · ".join(f"{s}: {n}" for s, n in sorted(store_counts.items()))
 
     return f"""
     <html><body style="font-family:Arial,sans-serif;max-width:820px;margin:auto;color:#333;padding:16px;">
         <h2 style="color:#1a6bcc;margin-bottom:4px;">🧗 Climbing Deals — {today}</h2>
-        <p style="margin:0 0 4px;color:#555;">{len(deals)} deals found · no clothing included</p>
-        <p style="margin:0 0 16px;color:#999;font-size:12px;">{store_summary}</p>
+        <p style="margin:0 0 4px;color:#555;">{len(deals)} deals · clothing excluded</p>
+        <p style="margin:0 0 16px;color:#999;font-size:12px;">{summary}</p>
         {sections}
         <p style="margin-top:24px;color:#bbb;font-size:11px;">
-            All prices include UK VAT · Full history in deals_log.csv in your GitHub repo
+            All prices include UK VAT · Full list in deals_log.csv in your GitHub repo
         </p>
     </body></html>
     """
@@ -330,13 +351,11 @@ def build_email_html(deals, today):
 def send_email(deals, today):
     subject = f"🧗 Climbing Deals {today} — {len(deals)} found"
     html    = build_email_html(deals, today)
-
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"]    = SENDER_EMAIL
     msg["To"]      = RECIPIENT_EMAIL
     msg.attach(MIMEText(html, "html"))
-
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.sendmail(SENDER_EMAIL, RECIPIENT_EMAIL, msg.as_string())
