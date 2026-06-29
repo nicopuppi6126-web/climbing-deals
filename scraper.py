@@ -20,27 +20,32 @@ STORES = [
     {
         "name": "Go Outdoors",
         "url":  "https://www.gooutdoors.co.uk",
+        # Go Outdoors uses compare_at_price on their main climbing collection
         "collections": ["climbing"],
     },
     {
         "name": "Tiso",
         "url":  "https://www.tiso.com",
-        "collections": ["climbing"],
+        # Tiso's main sale collection covers all discounted gear
+        "collections": ["sale"],
     },
     {
         "name": "Dick's Climbing",
         "url":  "https://www.dicksclimbing.com",
+        # Small specialist shop — scan everything and filter by compare_at_price
         "collections": ["all"],
     },
     {
         "name": "Rock + Run",
         "url":  "https://rockrun.com",
-        "collections": ["all"],
+        # Rock+Run uses /outlet for their discounted stock
+        "collections": ["outlet"],
     },
     {
         "name": "Bananafingers",
         "url":  "https://bananafingers.co.uk",
-        "collections": ["all"],
+        # Bananafingers splits deals across several collections
+        "collections": ["bargain-bin", "bargain-of-the-day", "summer-sale-collection", "last-season-s"],
     },
 ]
 
