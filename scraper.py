@@ -119,35 +119,39 @@ CATEGORIES = [
     ]),
 ]
 
-# Keywords that mark something as clothing we want to EXCLUDE
-CLOTHING_KEYWORDS = [
+# Words that identify clothing to EXCLUDE.
+# Uses word-boundary regex so "pant" matches "Pant"/"Pants" but not "important",
+# "tank" matches "Tank Top" but not "titanium", etc.
+CLOTHING_WORDS = [
     "jacket", "fleece", "softshell", "hardshell", "windshell",
-    "trouser", "pant ", "pants ", "legging", "short ", "shorts ",
-    "base layer", "baselayer", "mid layer", "midlayer",
-    "t-shirt", "tshirt", "shirt ", "polo",
-    "hoodie", "hoody", "sweatshirt", "jumper", "sweater",
-    "gilet", "vest ", " vest,", "insulated", "down jacket", "puffer",
-    "waterproof jacket", "rain jacket", "shell jacket",
-    "sock", "glove", "gaiter", "balaclava", "beanie", "hat ",
-    "buff ", "neck gaiter", "headband",
-    "underwear", "brief", "boxer",
-    "jogger", "legging", "tights",
+    "trouser", "trousers", "pant", "pants", "legging", "leggings",
+    "short", "shorts", "base layer", "baselayer", "mid layer", "midlayer",
+    "t-shirt", "tshirt", "shirt", "polo", "hoodie", "hoody",
+    "sweatshirt", "jumper", "sweater", "gilet", "vest", "puffer",
+    "sock", "socks", "glove", "gloves", "gaiter", "gaiters",
+    "balaclava", "beanie", "hat", "buff", "neck gaiter", "headband",
+    "underwear", "brief", "boxer", "jogger", "joggers", "tights",
+    "tank", "tee", "insulated",
 ]
+
+_CLOTHING_RE = re.compile(
+    r'\b(' + '|'.join(re.escape(w) for w in CLOTHING_WORDS) + r')\b',
+    re.IGNORECASE
+)
 
 def categorise(product_name):
     """Return category label, or None if the product should be excluded."""
     name_lower = product_name.lower()
 
-    # Check each category in order
+    # Check keep-categories first (shoes, hardware, etc.)
     for cat_label, keywords in CATEGORIES:
         if any(kw in name_lower for kw in keywords):
             return cat_label
 
-    # If nothing matched, check if it's clothing → exclude
-    if any(kw in name_lower for kw in CLOTHING_KEYWORDS):
+    # Clothing check uses word-boundary regex — no trailing-space tricks needed
+    if _CLOTHING_RE.search(product_name):
         return None  # drop it
 
-    # Unknown but not clothing → keep under a catch-all
     return "🔧 Other Gear"
 
 # ── SCRAPING ──────────────────────────────────────────────────────────────────
@@ -236,15 +240,14 @@ def get_deals(store):
 # ── LOGGING ───────────────────────────────────────────────────────────────────
 
 def log_deals(deals):
-    file_exists = os.path.isfile(LOG_FILE)
-    with open(LOG_FILE, "a", newline="", encoding="utf-8") as f:
+    # Overwrite each run — the CSV always reflects today's deals only
+    with open(LOG_FILE, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f, fieldnames=["date", "store", "category", "product", "price", "was", "discount_pct", "url"]
         )
-        if not file_exists:
-            writer.writeheader()
+        writer.writeheader()
         writer.writerows(deals)
-    print(f"  ✔ Logged {len(deals)} deals to {LOG_FILE}")
+    print(f"  ✔ Saved {len(deals)} deals to {LOG_FILE}")
 
 # ── EMAIL ─────────────────────────────────────────────────────────────────────
 
