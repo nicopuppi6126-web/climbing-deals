@@ -68,112 +68,95 @@ HEADERS = {
     )
 }
 
-# ── CATEGORISATION ────────────────────────────────────────────────────────────
-#
-# IMPORTANT LOGIC ORDER:
-#   1. Clothing check runs FIRST — if it matches, product is dropped immediately.
-#   2. Then gear categories are checked.
-#
-# Brand names are deliberately NOT used as category keywords because brands sell
-# both gear AND clothing. "Wild Country" in Hardware keywords caused all Wild Country
-# clothing to be categorised as Hardware. Only product-type words are used.
+# ── CATEGORIES ────────────────────────────────────────────────────────────────
+# Exactly the 10 product types requested. Each keyword list is tight and
+# specific — no brand names, no catch-alls. If a product doesn't clearly
+# match one of these, it is dropped.
 
-# --- Clothing exclusion (runs first) ---
-CLOTHING_WORDS = [
-    "jacket", "fleece", "softshell", "hardshell", "windshell", "windproof",
-    "trouser", "trousers", "pant", "pants", "legging", "leggings",
-    "short", "shorts", "base layer", "baselayer", "mid layer", "midlayer",
-    "t-shirt", "tshirt", "shirt", "polo",
-    "hoodie", "hoody", "sweatshirt", "jumper", "sweater",
-    "gilet", "vest", "puffer", "down jacket", "insulated jacket",
-    "waterproof", "rain jacket", "shell",
-    "sock", "socks", "glove", "gloves", "gaiter", "gaiters",
-    "balaclava", "beanie", "hat", "cap", "buff", "neck gaiter", "headband",
-    "underwear", "brief", "boxer",
-    "jogger", "joggers", "tights",
-    "tank top", "tank", "tee", "top",
-    "insulated", "primaloft", "down fill",
-    "jersey", "base-layer",
-]
-
-_CLOTHING_RE = re.compile(
-    r'\b(' + '|'.join(re.escape(w) for w in CLOTHING_WORDS) + r')\b',
-    re.IGNORECASE
-)
-
-# --- Gear categories (checked after clothing exclusion) ---
-# Product-type words only — no brand names.
 CATEGORIES = [
-    ("👟 Footwear", [
-        "climbing shoe", "climbing boot", "approach shoe", "approach boot",
-        "bouldering shoe", "rock shoe",
-        "mythos", "vapor v", "vapor vx", "solution", "miura", "katana",
-        "futura", "skwama", "instinct vs", "testarossa", "genius", "drago",
-        "tc pro", "anasazi", "finale", "python", "helix", "momentum",
-        "oracle", "tarantula", "tarrantulace",
+    ("🪢 Ropes", [
+        "climbing rope", "dynamic rope", "static rope", "half rope", "twin rope",
+        "dry rope", "single rope", "lead rope",
+        # match " rope " / "rope," / starts with "rope" to avoid "ropework" etc
     ]),
-    ("⚙️ Hardware", [
-        "carabiner", "karabiner",
-        "quickdraw", "quick draw",
-        "cam ", "cams ", " cam,", "friends ", "friend ",
-        " nut ", "nuts ", "stopper ", "stoppers ", "hex ", "tricam",
-        "belay device", "belay plate", "atc ", "grigri", "reverso",
-        "descender", "figure 8", "figure-8", "ascender", "jumar", "pulley",
-        "maillon", "snapgate", "wiregate", "screwgate",
-        "autolock", "triact", "magnetron",
-        "spring-loaded", "slcd", "passive protection",
-        "piton", "peg ",
+    ("🔗 Carabiners", [
+        "carabiner", "karabiner", "biner",
+        "screwgate", "wiregate", "snapgate", "autolock",
+        "triact", "magnetron", "ball lock", "twist lock", "screw lock",
+        "hms ", " hms,", "pear-shaped", "d-shape", "oval carabiner",
     ]),
-    ("🪢 Ropes & Slings", [
-        "rope ", "ropes ", " rope,",
-        "dynamic rope", "static rope", "half rope", "twin rope",
-        "sling ", "slings ", "runner ", "runners ",
-        "dyneema", "spectra", "webbing", "tape sling", "alpine draw",
-        "cordelette", "accessory cord",
+    ("⚡ Quickdraws", [
+        "quickdraw", "quick draw", "express set", "sport draw",
+        "alpine draw", "wire draw",
     ]),
-    ("🪖 Protection & Safety", [
-        "helmet", "crash pad", "bouldering mat", "landing pad", "bouldering pad",
+    ("👟 Climbing Shoes", [
+        "climbing shoe", "climbing boot", "rock shoe", "bouldering shoe",
+        # Unambiguous model names that are shoes and nothing else
+        "mythos", "vapor v", "vapor vx", "solution comp", "miura vs",
+        "miura lace", "katana lace", "skwama", "futura", "testarossa",
+        "genius", "drago", "tc pro", "anasazi", "tarantulace", "tarantula",
+        "instinct vs", "instinct vsr", "helix", "finale", "oracle",
+        "python shoe", "momentum shoe",
     ]),
-    ("🎒 Bags & Packs", [
-        "chalk bag", "chalk bucket", "chalk pot",
-        "rope bag", "rope tarp",
-        "haul bag", "crag bag", "climbing bag",
-        "climbing pack", "climbing rucksack",
+    ("🔒 Harnesses", [
+        "harness", "climbing harness", "sit harness", "belay harness",
+        "sport harness", "trad harness", "big wall harness",
+        "chest harness", "full body harness",
     ]),
-    ("🧴 Accessories & Training", [
-        "chalk ", "loose chalk", "liquid chalk", "chalk ball",
-        "fingerboard", "hangboard", "campus board", "training board",
-        "pulley system", "finger pulley",
-        "climbing tape", "finger tape", "rigid tape",
-        "climbing brush", "tick mark",
-        "crampon", "ice axe", "ice tool",
-        "harness ", "sit harness", "chest harness", "full body harness",
-        "via ferrata", "via-ferrata",
-        "clip stick", "stick clip",
-        "guidebook", "guide book", "topo",
-        "boot banana", "gear sling", "gear loop",
-        "belay glasses", "belay spectacles",
-        "quicklink", "quick link",
+    ("🛡️ Slings & Cords", [
+        "sling", "runner",
+        "dyneema sling", "nylon sling", "spectra sling",
+        "accessory cord", "cordelette", "prussik", "prusik",
+        "tape sling", "sewn sling",
+    ]),
+    ("⚙️ Belay Devices", [
+        "belay device", "belay plate", "belay tool",
+        "grigri", "gri-gri", "reverso", "atc ", " atc,",
+        "mega jul", "smart alpine", "verso ",
+        "assisted braking", "auto-blocking", "tube device",
+    ]),
+    ("🧗 Ascenders", [
+        "ascender", "jumar", "hand ascender", "chest ascender",
+        "micro ascender", "rope clamp", "tibloc", "ropeman",
+        "basic ascender", "croll",
+    ]),
+    ("⬇️ Descenders", [
+        "descender", "figure 8", "figure-8", "rappel device",
+        "abseil device", "rack ", " rack,", "i'dwall", "id wall",
+        "stop descender", "simple descender",
     ]),
 ]
+
+# Build one flat set of all kept keywords for a fast first-pass check
+_ALL_KEEP_PATTERNS = [kw for _, kws in CATEGORIES for kw in kws]
 
 def categorise(product_name):
     """
-    Returns a category string, or None if the product should be excluded.
-    Clothing check runs FIRST before any gear category check.
-    """
-    # Step 1: exclude clothing immediately
-    if _CLOTHING_RE.search(product_name):
-        return None
+    Returns category_label if the product matches one of the 10 types,
+    or None if it should be dropped. No catch-all — unknown = dropped.
 
-    # Step 2: match gear category by product-type keywords
+    Explicit type words in the product name (rope, descender, ascender,
+    harness) take priority so e.g. "ATC Pilot Descender" → Descenders
+    even though "atc" would normally match Belay Devices first.
+    """
     name_lower = product_name.lower()
+
+    # Priority overrides — if the product name contains these explicit type
+    # words, categorise immediately without checking other keywords first.
+    if re.search(r'\bdescender\b', name_lower):
+        return "⬇️ Descenders"
+    if re.search(r'\bascender\b', name_lower):
+        return "🧗 Ascenders"
+    if re.search(r'\bharness\b', name_lower):
+        return "🔒 Harnesses"
+    if re.search(r'\brope\b', name_lower):
+        return "🪢 Ropes"
+
     for cat_label, keywords in CATEGORIES:
         if any(kw in name_lower for kw in keywords):
             return cat_label
 
-    # Step 3: not clothing, not a known category — keep as catch-all
-    return "🔧 Other Gear"
+    return None  # doesn't match any of the 10 types → drop it
 
 # ── SCRAPING ──────────────────────────────────────────────────────────────────
 
@@ -206,7 +189,7 @@ def get_deals(store):
             for product in products:
                 category = categorise(product["title"])
                 if category is None:
-                    continue  # clothing — skip
+                    continue  # not one of our 10 types → skip
 
                 for variant in product.get("variants", []):
                     vid = variant.get("id")
@@ -261,7 +244,6 @@ def get_deals(store):
 # ── LOGGING ───────────────────────────────────────────────────────────────────
 
 def log_deals(deals):
-    # Overwrite each run — CSV always contains today's deals only
     with open(LOG_FILE, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f, fieldnames=["date", "store", "category", "product", "price", "was", "discount_pct", "url"]
@@ -274,20 +256,22 @@ def log_deals(deals):
 
 def build_email_html(deals, today):
     if not deals:
-        return f"<p>No relevant climbing deals found today ({today}).</p>"
+        return f"<p>No deals found today ({today}) across your 10 product types.</p>"
 
     by_category = {}
     for d in deals:
         by_category.setdefault(d["category"], []).append(d)
 
     cat_order = [
-        "⚙️ Hardware",
-        "👟 Footwear",
-        "🪢 Ropes & Slings",
-        "🪖 Protection & Safety",
-        "🎒 Bags & Packs",
-        "🧴 Accessories & Training",
-        "🔧 Other Gear",
+        "🔗 Carabiners",
+        "⚡ Quickdraws",
+        "🪢 Ropes",
+        "🛡️ Slings & Cords",
+        "🔒 Harnesses",
+        "⚙️ Belay Devices",
+        "🧗 Ascenders",
+        "⬇️ Descenders",
+        "👟 Climbing Shoes",
     ]
 
     sections = ""
@@ -316,7 +300,7 @@ def build_email_html(deals, today):
 
         sections += f"""
         <h3 style="margin:24px 0 6px;color:#333;font-size:15px;">{cat}
-            <span style="font-weight:normal;color:#999;font-size:13px;">({len(items)} deals)</span>
+            <span style="font-weight:normal;color:#999;font-size:13px;">({len(items)})</span>
         </h3>
         <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
             <thead>
@@ -339,7 +323,7 @@ def build_email_html(deals, today):
     return f"""
     <html><body style="font-family:Arial,sans-serif;max-width:820px;margin:auto;color:#333;padding:16px;">
         <h2 style="color:#1a6bcc;margin-bottom:4px;">🧗 Climbing Deals — {today}</h2>
-        <p style="margin:0 0 4px;color:#555;">{len(deals)} deals · clothing excluded</p>
+        <p style="margin:0 0 4px;color:#555;">{len(deals)} deals across {len(by_category)} categories</p>
         <p style="margin:0 0 16px;color:#999;font-size:12px;">{summary}</p>
         {sections}
         <p style="margin-top:24px;color:#bbb;font-size:11px;">
@@ -370,12 +354,12 @@ def main():
     all_deals = []
     for store in STORES:
         deals = get_deals(store)
-        print(f"  → {len(deals)} relevant deals at {store['name']}")
+        print(f"  → {len(deals)} deals at {store['name']}")
         all_deals.extend(deals)
 
     all_deals.sort(key=lambda x: x["discount_pct"], reverse=True)
 
-    print(f"\nTotal relevant deals: {len(all_deals)}")
+    print(f"\nTotal: {len(all_deals)} deals")
     log_deals(all_deals)
     send_email(all_deals, today)
     print("\nDone ✔\n")
