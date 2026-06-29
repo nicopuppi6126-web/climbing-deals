@@ -127,22 +127,23 @@ CATEGORIES = [
     ]),
 ]
 
-# Build one flat set of all kept keywords for a fast first-pass check
-_ALL_KEEP_PATTERNS = [kw for _, kws in CATEGORIES for kw in kws]
+# Rope diameter pattern: climbing ropes are 7.5–11mm diameter.
+# Many ropes are sold by diameter alone (e.g. "Edelweiss 10mm Flashlight II")
+# with no word "rope" in the title at all.
+_ROPE_DIAMETER_RE = re.compile(r'\b(7\.[5-9]|8\.[0-9]|9\.[0-9]|10\.[0-9]|10|11)mm\b', re.IGNORECASE)
 
 def categorise(product_name):
     """
     Returns category_label if the product matches one of the 10 types,
     or None if it should be dropped. No catch-all — unknown = dropped.
 
-    Explicit type words in the product name (rope, descender, ascender,
-    harness) take priority so e.g. "ATC Pilot Descender" → Descenders
-    even though "atc" would normally match Belay Devices first.
+    Priority overrides run first so explicit type words in the product name
+    always win over keyword list matches (e.g. "ATC Pilot Descender" → Descenders).
+    Rope diameter matching catches ropes sold by spec rather than name.
     """
     name_lower = product_name.lower()
 
-    # Priority overrides — if the product name contains these explicit type
-    # words, categorise immediately without checking other keywords first.
+    # Priority overrides — explicit type words win immediately
     if re.search(r'\bdescender\b', name_lower):
         return "⬇️ Descenders"
     if re.search(r'\bascender\b', name_lower):
@@ -150,6 +151,9 @@ def categorise(product_name):
     if re.search(r'\bharness\b', name_lower):
         return "🔒 Harnesses"
     if re.search(r'\brope\b', name_lower):
+        return "🪢 Ropes"
+    # Diameter-based rope detection (e.g. "10mm Flashlight II", "9.7mm Booster")
+    if _ROPE_DIAMETER_RE.search(product_name):
         return "🪢 Ropes"
 
     for cat_label, keywords in CATEGORIES:
