@@ -2,9 +2,13 @@ name: Daily Climbing Deals
 
 on:
   schedule:
-    # Runs every day at 7:00 AM UTC (8am UK summer / 7am winter)
     - cron: "0 7 * * *"
-  workflow_dispatch:   # also lets you run it manually with one click
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   scrape:
@@ -28,12 +32,29 @@ jobs:
         env:
           GMAIL_ADDRESS:      ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GH_PAGES_URL:       "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
         run: python scraper.py
 
-      - name: Commit updated deals log
+      - name: Commit updated files
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add deals_log.csv
-          git diff --staged --quiet || git commit -m "chore: deals log $(date -u +%Y-%m-%d)"
+          git add deals_log.csv index.html
+          git diff --staged --quiet || git commit -m "chore: deals $(date -u +%Y-%m-%d)"
           git push
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."
+
+  deploy:
+    needs: scrape
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
